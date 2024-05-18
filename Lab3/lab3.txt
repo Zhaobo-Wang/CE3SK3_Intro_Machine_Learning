@@ -1,0 +1,118 @@
+image1 = "/MATLAB Drive/SK3_Project3/image.jpg";
+image = imread(image1);
+figure;
+imshow(image);
+
+
+image_gray = rgb2gray(image);
+figure;
+imshow(image_gray);
+image_gray = double(image_gray);
+
+
+kernel = [1,1,2,2,2,1,1; 1,2,2,4,2,2,1; 2,2,4,8,4,2,2; 2,4,8,32,8,4,2; 2,2,4,8,4,2,2; 1,2,2,4,2,2,1; 1,1,2,2,2,1,1;]/155;
+
+
+blurred_image = conv2(image_gray, kernel, 'same');
+blurred_image = uint8(blurred_image);
+
+figure;
+subplot(1,2,1);
+imshow(uint8(image_gray));
+subplot(1,2,2);
+imshow(blurred_image);
+
+if size(image, 3) == 3
+    image_gray = rgb2gray(image);
+else
+    image_gray = image;
+end
+
+A = constructConvMatrix(double(image_gray),double(kernel));
+b = double(blurred_image(:));
+
+disp(size(A));
+disp(size(b));
+[L, U, P] = myLUDecomposition(A);
+
+pb = P*b;
+d = L \ pb;
+
+x = U \ d;
+
+
+deblurred_image = reshape(x, size(blurred_image));
+figure;
+imshow(uint8(deblurred_image));
+
+function A = constructConvMatrix(image, kernel)
+    [m, n] = size(image);
+    [p, q] = size(kernel);
+    
+
+    center_p = floor((p-1)/2);
+    center_q = floor((q-1)/2);
+
+
+    A = sparse(m*n, m*n);
+
+
+    for row = 1:m
+        for col = 1:n
+            for k = 1:p
+                for l = 1:q
+                    row_offset = k - center_p - 1;
+                    col_offset = l - center_q - 1;
+                    
+                    orig_row = row + row_offset;
+                    orig_col = col + col_offset;
+
+
+                    if orig_row > 0 && orig_row <= m && orig_col > 0 && orig_col <= n
+                        A((row-1)*n+col, (orig_row-1)*n+orig_col) = kernel(k, l);
+                    end
+                end
+            end
+        end
+    end
+end
+
+function [L,U,P] =myLUDecomposition(A)
+    [m,n] = size(A);
+    U = A;
+    L = eye(n);
+    P = eye(n);
+
+    for i = 1:n-1
+
+        pivotRow = findMaxPivotRow(U, i, n);
+
+        if pivotRow ~=i
+            [U, L, P] = swapRows(U, L, P, i, pivotRow);
+        end
+
+        for j = i+1:n
+            %{
+            if U(i,i) == 0
+                error('Zero divider')
+            end
+            %}
+            %multiplication_number = U(j,i)/U(i,i);
+            L(j,i) = U(j,i)/U(i,i);
+            U(j,i:n) = U(j, i:n) - L(j,i)*U(i,i:n);
+        end
+    end
+end
+
+function [U, L, P] = swapRows(U, L, P, row1, row2)
+    U([row1,row2],:) = U([row2,row1],:);
+    L([row1,row2],1:row1-1) = L([row2,row1],1:row1-1);
+    P([row1,row2],:) = P([row2,row1],:);
+end
+
+function pivotRow = findMaxPivotRow(U, currentRow, totalRows) 
+    [~, pivotRow] = max(abs(U(currentRow:totalRows, currentRow))); 
+    pivotRow = pivotRow + currentRow - 1; 
+end
+
+
